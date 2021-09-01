@@ -1,24 +1,22 @@
 import logging
-
+import os
 import azure.functions as func
+from net.requester.requester import Requester
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Python HTTP trigger function processed a request.')
+    logging.info('Processing an order from ShipStation')
+    resource_url = req.params['resource_url']
+    resource_type = req.params['resource_type']
 
-    name = req.params.get('name')
-    if not name:
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            name = req_body.get('name')
+    print(resource_url, resource_type)
 
-    if name:
-        return func.HttpResponse(f"Hello, {name}. This HTTP triggered function executed successfully.")
-    else:
-        return func.HttpResponse(
-             "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.",
-             status_code=200
-        )
+    if (resource_type != 'SHIP_NOTIFY'):
+        return func.HttpResponse(f'This is not a "on items shipped" webhook', status_code=400)
+
+    shipstation_requester = Requester('https://ssapi.shipstation.com', 'ssapi.shipstation.com')
+    shipstation_requester.encode_base64(os.environ['SS_KEY'], os.environ['SS_SECRET_KEY'])
+
+    order_info = shipstation_requester.get(resource_url)
+
+    return func.HttpResponse(order_info)
