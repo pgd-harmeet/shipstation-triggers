@@ -1,22 +1,20 @@
 import logging
 import os
 import azure.functions as func
-from net.requester.requester import Requester
+import net.requester as request
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Processing an order from ShipStation')
-    resource_url = req.params['resource_url']
-    resource_type = req.params['resource_type']
-
-    print(resource_url, resource_type)
-
+    req = req.get_json()
+    resource_url = req['resource_url']
+    resource_type = req['resource_type']
+    
     if (resource_type != 'SHIP_NOTIFY'):
         return func.HttpResponse(f'This is not a "on items shipped" webhook', status_code=400)
 
-    shipstation_requester = Requester('https://ssapi.shipstation.com', 'ssapi.shipstation.com')
-    shipstation_requester.encode_base64(os.environ['SS_KEY'], os.environ['SS_SECRET_KEY'])
+    order_info = request.get(resource_url, None, headers={'Authorization': 'Basic M2I3MmUyOGI0ZWI1NDdhYjk3NmNjMGFjOGIxYTA2NjI6ZmUyYmJjNjRkN2RlNDI2YzhjMjk4YjQxMDdkYWM2MGE='})
 
-    order_info = shipstation_requester.get(resource_url)
+    logging.info(order_info.json())
 
-    return func.HttpResponse(order_info)
+    return func.HttpResponse("Finished")
