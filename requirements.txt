@@ -2,4 +2,3 @@
 
 azure-functions
 pandas
-git+https://github.com/pgd-harmeet/net.git

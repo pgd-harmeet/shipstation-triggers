@@ -1,9 +1,10 @@
 import logging
 import os
 import azure.functions as func
-import net.requester as request
 import datetime
 import re
+
+import requests
 
 
 def main(req: func.HttpRequest) -> str:
@@ -16,7 +17,7 @@ def main(req: func.HttpRequest) -> str:
         return func.HttpResponse(f'This is not a "on items shipped" webhook', status_code=400)
     
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = request.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
+    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
     order_info = order_info.json()
 
     return generate_order_sheet(order_info)
