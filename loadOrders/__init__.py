@@ -30,6 +30,9 @@ def generate_order_sheet(order_info):
 
 
 def _generate_header(order_info):
+    """
+    Generates a header entry for an order
+    """
     # Initialize header
     header = 'H'
 
@@ -102,7 +105,7 @@ def _generate_header(order_info):
     total_deposit = 0
     for item in order_info['shipmentItems']:
         total_deposit += item['unitPrice']
-    header += normalize_value(total_deposit)
+    header += normalize_value(total_deposit, 7, 2)
 
     # Expected & expiration date
     header += '0' * 16
@@ -127,7 +130,7 @@ def _generate_header(order_info):
     # Check number
     header += '0' * 6
     # Bankcard tendered
-    header += normalize_value(total_deposit)
+    header += normalize_value(total_deposit, 7, 2)
 
     # TODO Bankcard number
     header += ' ' * 16
@@ -149,6 +152,49 @@ def _generate_header(order_info):
     header += ' ' * 6
 
     return header
+
+def _generate_details(order_info):
+    """
+    Generates a detail entry for each item in the order
+    """
+    detail = ''
+
+    for item in order_info['shipmentItems']:
+        detail += 'D'
+
+        # Sku
+        detail += item['sku'] + ' ' * (14 - len(item['sku']))
+
+        # Item transaction type (space for sale)
+        detail += ' '
+
+        # Item description (blank for IMU description)
+        detail += ' ' * 32
+
+        # Taxable?
+        detail += 'Y'
+
+        # Pricing flag, manual price, estimate use code, trade discount,
+        # discount percent, special order vendor, unit of measure
+        detail += ' ' * 16
+
+        # Quantity
+        detail += normalize_value(item['quantity'], 5, 3, signed=False)
+
+        # Unit price
+        detail += normalize_value(item['unitPrice'], 5, 3, signed=False)
+
+        # Extended Price
+        detail += normalize_value(item['quantity'] * item['unitPrice'], 6, 2, signed=False)
+
+        # Unit cost, imported from Eagle automatically
+        detail += ' ' * 8
+
+        # BOM sku, reference number, extended taxable, extended non-taxable
+        # backorder quantity, unused, terms discount, direct ship, unused, filler
+        detail += ' ' * 384 + '\n'
+
+    return detail
 
 def normalize_value(value, integar_part, frac_part, signed=True):
     """
