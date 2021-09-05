@@ -14,8 +14,9 @@
     {
       "type": "blob",
       "direction": "out",
-      "name": "outputBlob",
-      "path": ""
+      "name": "$return",
+      "path": "eagle-orders/{httpTrigger}",
+      "connection": "AzureWebJobsStorage"
     }
   ]
 }

@@ -7,7 +7,7 @@ import re
 import requests
 
 
-def main(req: func.HttpRequest, outputBlob: func.Out[str]) -> None:
+def main(req: func.HttpRequest):
     logging.info('Processing an order from ShipStation')
     req = req.get_json()
     resource_url = req['resource_url']
@@ -20,7 +20,7 @@ def main(req: func.HttpRequest, outputBlob: func.Out[str]) -> None:
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
     order_info = order_info.json()
 
-    outputBlob.set(generate_order_sheet)
+    return generate_order_sheet
 
 def generate_order_sheet(order_info):
     order_data = order_info['shipments'][0]
