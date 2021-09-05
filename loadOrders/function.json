@@ -15,7 +15,7 @@
       "type": "blob",
       "direction": "out",
       "name": "$return",
-      "path": "eagle-orders/"
+      "path": "eagle-orders"
     }
   ]
 }
