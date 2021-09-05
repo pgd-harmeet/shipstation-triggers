@@ -6,14 +6,16 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
+      "connection": "AzureWebJobsStorage",
       "methods": [
         "post"
       ]
     },
     {
-      "type": "http",
+      "type": "blob",
       "direction": "out",
-      "name": "$return"
+      "name": "$return",
+      "path": "eagle-orders/"
     }
   ]
 }
