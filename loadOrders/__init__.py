@@ -20,7 +20,7 @@ def main(req: func.HttpRequest, outputblob: func.Out[str]):
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
     order_info = order_info.json()
 
-    outputblob.set(generate_order_sheet)
+    outputblob.set(generate_order_sheet(order_info))
 
 def generate_order_sheet(order_info):
     order_data = order_info['shipments'][0]
