@@ -150,11 +150,33 @@ def _generate_header(order_info):
 
     return header
 
-def normalize_value(value):
+def normalize_value(value, integar_part, frac_part, signed=True):
     """
-    Normalizes monetary value so that it conforms to Eagle's 9(7)v9(2) +/- format
+    Normalizes monetary value so that it conforms to Eagle's number formatting
+    system wherein the number of spots before and after an implied decimal are given
+    Returns a signed number by default
+
+    v is the implied decimal spot
+
+    For a given value $112.40:
+    9(4)v9(3) gives 0112400
+    9(4)v9(3)+ gives 011240+
+    9(5)v9(3) gives 00112400
+
+
     :param value: Value to be normalized
+    :param integar_part: Number of values to the left of the implied decimal
+    :param frac_part: Number of values to the right of the implied decimal
+    :param signed: Whether or not the returned value is a signed number
     :return: Normalized value
     """
+    sign = ''
+
+    if signed:
+        if value < 0:
+            sign = '-'
+        else :
+            sign = '+'
     value = int(value * 100)
-    return '0' * (9 - len(str(value))) + str(value) + '+'
+    value = str(value) + '0' * (frac_part - 2)
+    return '0' * ((integar_part + frac_part) - len(value)) + value + sign
