@@ -18,15 +18,15 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = request.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
     order_info = order_info.json()
+    generate_order_sheet(order_info)
 
     return func.HttpResponse(f"Order sheet for order {order_info['shipments'][0]['orderKey']}")
 
 def generate_order_sheet(order_info):
     order_data = order_info['shipments'][0]
 
-    header = _generate_header(order_data)
-
-    print(header)
+    logging.info(_generate_header(order_data))
+    logging.info(_generate_details(order_data))
 
 
 def _generate_header(order_info):
