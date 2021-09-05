@@ -6,7 +6,7 @@ import datetime
 import re
 
 
-def main(req: func.HttpRequest) -> func.HttpResponse:
+def main(req: func.HttpRequest) -> str:
     logging.info('Processing an order from ShipStation')
     req = req.get_json()
     resource_url = req['resource_url']
@@ -18,15 +18,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = request.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
     order_info = order_info.json()
-    generate_order_sheet(order_info)
 
-    return func.HttpResponse(f"Order sheet for order {order_info['shipments'][0]['orderKey']}")
+    return generate_order_sheet(order_info)
 
 def generate_order_sheet(order_info):
     order_data = order_info['shipments'][0]
 
-    logging.info(_generate_header(order_data))
-    logging.info(_generate_details(order_data))
+    header = _generate_header(order_data)
+    details = _generate_details(order_data)
+
+    return header + '\n' + details
 
 
 def _generate_header(order_info):
