@@ -41,3 +41,7 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
