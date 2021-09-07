@@ -12,10 +12,9 @@
       ]
     },
     {
-      "type": "blob",
+      "type": "http",
       "direction": "out",
-      "name": "outputblob",
-      "path": "eagle-orders/{httpTrigger}",
+      "name": "$return",
       "connection": "AzureWebJobsStorage"
     }
   ]

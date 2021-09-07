@@ -2,3 +2,5 @@
 
 azure-functions
 pandas
+azure-storage-blob
+aiohttp
