@@ -8,16 +8,6 @@ import requests
 
 async def main(req: func.HttpRequest):
     logging.info('Processing an order from ShipStation')
-<<<<<<< HEAD
-    req = req.get_json()
-    resource_url = req['resource_url']
-    resource_type = req['resource_type']
-    logging.info(resource_url)
-
-    if (resource_type != 'SHIP_NOTIFY'):
-        return func.HttpResponse(f'This is not a "on items shipped" webhook', status_code=400)
-
-=======
     try:
         req = req.get_json()
         resource_url = req['resource_url']
@@ -29,18 +19,13 @@ async def main(req: func.HttpRequest):
         return func.HttpResponse(f'This is not an "on items shipped" webhook', status_code=400)
 
     # Makes the response include items that were shipped with that order
->>>>>>> develop
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = requests.get(resource_url, None, headers={'Authorization': 'Basic M2I3MmUyOGI0ZWI1NDdhYjk3NmNjMGFjOGIxYTA2NjI6ZmUyYmJjNjRkN2RlNDI2YzhjMjk4YjQxMDdkYWM2MGE='})
     order_sheet = generate_order_sheet(order_info)
 
-<<<<<<< HEAD
-    # outputblob.set(generate_order_sheet(order_info))
-=======
     blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
         container_name='eagle-orders',
         blob_name=str(order_info['shipments'][0]['orderId']) + '.txt')
->>>>>>> develop
 
     await blob.upload_blob(order_sheet)
     await blob.close()
