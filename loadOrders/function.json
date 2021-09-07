@@ -14,12 +14,7 @@
     {
       "type": "http",
       "direction": "out",
-<<<<<<< HEAD
-      "name": "outputblob",
-      "path": "eagle-orders",
-=======
       "name": "$return",
->>>>>>> develop
       "connection": "AzureWebJobsStorage"
     }
   ]
