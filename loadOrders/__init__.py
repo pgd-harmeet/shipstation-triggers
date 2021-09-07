@@ -1,14 +1,14 @@
 import logging
 import os
 import azure.functions as func
+from azure.storage.blob.aio import BlobClient
 import datetime
 import re
-
 import requests
 
-
-def main(req: func.HttpRequest, outputblob: func.Out[str]):
+async def main(req: func.HttpRequest):
     logging.info('Processing an order from ShipStation')
+<<<<<<< HEAD
     req = req.get_json()
     resource_url = req['resource_url']
     resource_type = req['resource_type']
@@ -17,20 +17,43 @@ def main(req: func.HttpRequest, outputblob: func.Out[str]):
     if (resource_type != 'SHIP_NOTIFY'):
         return func.HttpResponse(f'This is not a "on items shipped" webhook', status_code=400)
 
+=======
+    try:
+        req = req.get_json()
+        resource_url = req['resource_url']
+        resource_type = req['resource_type']
+    except (ValueError, KeyError):
+        return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
+
+    if (resource_type != 'SHIP_NOTIFY'):
+        return func.HttpResponse(f'This is not an "on items shipped" webhook', status_code=400)
+
+    # Makes the response include items that were shipped with that order
+>>>>>>> develop
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
-    order_info = order_info.json()
+    order_info = requests.get(resource_url, None, headers={'Authorization': 'Basic M2I3MmUyOGI0ZWI1NDdhYjk3NmNjMGFjOGIxYTA2NjI6ZmUyYmJjNjRkN2RlNDI2YzhjMjk4YjQxMDdkYWM2MGE='})
+    order_sheet = generate_order_sheet(order_info)
 
+<<<<<<< HEAD
     # outputblob.set(generate_order_sheet(order_info))
+=======
+    blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
+        container_name='eagle-orders',
+        blob_name=str(order_info['shipments'][0]['orderId']) + '.txt')
+>>>>>>> develop
 
-def generate_order_sheet(order_info):
-    order_data = order_info['shipments'][0]
+    await blob.upload_blob(order_sheet)
+    await blob.close()
+
+    return func.HttpResponse('Successfully created Eagle order sheet')
+
+def generate_order_sheet(order):
+    order_data = order['shipments'][0]
 
     header = _generate_header(order_data)
     details = _generate_details(order_data)
 
     return header + '\n' + details
-
 
 def _generate_header(order_info):
     """
