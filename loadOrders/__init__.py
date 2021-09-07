@@ -26,7 +26,7 @@ async def main(req: func.HttpRequest):
 
     blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
         container_name='eagle-orders',
-        blob_name=str(order_info['shipments'][0]['orderId']) + '.txt')
+        blob_name=str('EagleOrder_M' + order_info['shipments'][0]['orderId']) + 'O.txt')
 
     await blob.upload_blob(order_sheet)
     await blob.close()
@@ -59,11 +59,12 @@ def _generate_header(order_info):
     # Customer job number, set to default Eagle value
     header += '0' * 3
 
-    # TODO: Add tax code
-    header += 'ZZZ'
+    # MTX tax code
+    header += ' ' * 3
 
-    # TODO: Add tax rate
-    header += '0' * 5
+    # Tax rate charged
+    tax_rate = order_info['shipmentItems'][0]['taxAmount'] / order_info['shipmentItems'][0]['unitPrice']
+    header += '0' + str(tax_rate * 100000)
 
     # Pricing indicator and percentage
     header += 'R0000'
@@ -78,8 +79,20 @@ def _generate_header(order_info):
     # Sales person number
     header += ' ' * 2
 
-    # TODO: Add sales tax
-    header += '0' * 9 + '+'
+    # Add sales tax
+    order_num = order_info['orderNumber']
+    if re.match(r'.+-.+-.+', order_num) or re.match(r'5.+'):
+        header += '0' * 9 + '+'
+    else:
+        subtotal = 0
+        tax_total = 0
+        for item in order_info['shipmentItems']:
+            subtotal += item['unitPrice']
+            tax_total += item['taxAmount']
+        
+        total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
+
+        header += normalize_value(total_sales_tax, 7 ,2)
 
     # Always blank lines
     header += ' ' * 10
@@ -87,8 +100,8 @@ def _generate_header(order_info):
     # TODO: Instructions 1
     header += ' ' * 30
 
-    # TODO: Instructions 2
-    header += ' ' * 30
+    # Instructions 2
+    header += order_num + ' ' * (30 - len(order_num))
 
     # Ship-To Name
     ship_to_name = order_info['shipTo']['name']
@@ -110,7 +123,7 @@ def _generate_header(order_info):
     # Customer Telephone
     telephone = order_info['shipTo']['phone']
     tele_normalized = re.sub(r'\s+|-|(\+\d)|(ext\..+)', '', telephone)
-    header += tele_normalized[-10] + ' ' * (10 - len(tele_normalized)[-10])
+    header += tele_normalized[-10] + ' ' * (10 - len(tele_normalized[-10]))
     # Customer resale no., customer ID, special order vendor
     header += ' ' * 34
     # Total deposit
