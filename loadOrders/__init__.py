@@ -82,7 +82,7 @@ def _generate_header(order_info):
 
     # Add sales tax
     order_num = order_info['orderNumber']
-    if re.match(r'.+-.+-.+', order_num) or re.match(r'5.+'):
+    if re.match(r'.+-.+-.+', order_num) or re.match(r'5.+', order_num):
         header += '0' * 9 + '+'
     else:
         subtotal = 0
