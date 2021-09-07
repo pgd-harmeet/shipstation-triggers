@@ -22,11 +22,12 @@ async def main(req: func.HttpRequest):
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
     order_info = order_info.json()
+    logging.info(f'Creating order sheet for {order_info["orderKey"]}')
     order_sheet = generate_order_sheet(order_info)
 
     blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
         container_name='eagle-orders',
-        blob_name=str('EagleOrder_M' + order_info['shipments'][0]['orderId']) + 'O.txt')
+        blob_name='EagleOrder_M' + str(order_info['shipments'][0]['orderId'])) + 'O.txt'
 
     await blob.upload_blob(order_sheet)
     await blob.close()
