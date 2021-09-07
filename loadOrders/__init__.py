@@ -141,7 +141,8 @@ def _generate_header(order_info):
     # TODO Transaction number
     header += '0' * 8
 
-    # TODO Transaction Type
+    # Transaction Type
+    # 1 for "Cash Sale"
     header += '1'
 
     # Total cash tendered
