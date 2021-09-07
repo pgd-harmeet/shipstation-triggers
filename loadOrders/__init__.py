@@ -21,7 +21,7 @@ async def main(req: func.HttpRequest):
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = requests.get(resource_url, None, headers={'Authorization': 'Basic M2I3MmUyOGI0ZWI1NDdhYjk3NmNjMGFjOGIxYTA2NjI6ZmUyYmJjNjRkN2RlNDI2YzhjMjk4YjQxMDdkYWM2MGE='})
-    order_sheet = generate_order_sheet(order_info)
+    order_sheet = generate_order_sheet(order_info.json())
 
     blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
         container_name='eagle-orders',
