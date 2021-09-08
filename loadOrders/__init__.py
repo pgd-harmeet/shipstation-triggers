@@ -130,7 +130,7 @@ def _generate_header(order_info):
     # Customer Telephone
     telephone = order_info['shipTo']['phone']
     tele_normalized = re.sub(r'\s+|-|(\+\d)|(ext\..+)', '', telephone)
-    header += tele_normalized[-10] + ' ' * (10 - len(tele_normalized[-10]))
+    header += tele_normalized[-10:] + ' ' * (10 - len(tele_normalized[-10:]))
     # Customer resale no., customer ID, special order vendor
     header += ' ' * 34
     # Total deposit
