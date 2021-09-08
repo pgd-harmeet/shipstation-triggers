@@ -27,7 +27,7 @@ async def main(req: func.HttpRequest):
 
     blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
         container_name='eagle-orders',
-        blob_name='EagleOrder_M' + str(order_info['shipments'][0]['orderId'])) + 'O.txt'
+        blob_name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt')
 
     await blob.upload_blob(order_sheet)
     await blob.close()
