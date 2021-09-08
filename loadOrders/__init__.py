@@ -95,7 +95,7 @@ def _generate_header(order_info):
         tax_total = 0
         for item in order_info['shipmentItems']:
             subtotal += item['unitPrice']
-            tax_total += item['taxAmount']
+            tax_total += item['taxAmount'] or 0
         
         total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
 
