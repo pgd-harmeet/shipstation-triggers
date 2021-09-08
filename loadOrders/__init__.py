@@ -94,8 +94,12 @@ def _generate_header(order_info):
         subtotal = 0
         tax_total = 0
         for item in order_info['shipmentItems']:
+            item_tax = item['taxAmount']
             subtotal += item['unitPrice']
-            tax_total += item['taxAmount'] or 0
+            if item_tax is not None:
+                tax_total += item['taxAmount']
+            else:
+                tax_total += '0'
         
         total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
 
@@ -117,7 +121,7 @@ def _generate_header(order_info):
     ship_to_addr_1 = order_info['shipTo']['street1']
     header += ship_to_addr_1 + ' ' * (30 - len(ship_to_addr_1))
     # Ship-To Address 2
-    ship_to_addr_2 = order_info['shipTo']['street2']
+    ship_to_addr_2 = order_info['shipTo']['street2'] or ''
     header += ship_to_addr_2 + ' ' * (30 - len(ship_to_addr_2))
     # Ship-To Address 3
     ship_to_addr_3 = order_info['shipTo']['city'] + ' ' + \
