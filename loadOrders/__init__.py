@@ -64,7 +64,12 @@ def _generate_header(order_info):
     header += ' ' * 3
 
     # Tax rate charged
-    tax_rate = order_info['shipmentItems'][0]['taxAmount'] / order_info['shipmentItems'][0]['unitPrice']
+    tax_amount = order_info['shipmentItems'][0]['taxAmount']
+    unit_price = order_info['shipmentsItems'][0]['unitPrice']
+
+    if tax_amount is None:
+        tax_amount = 0
+    tax_rate = tax_amount / unit_price
     header += '0' + str(tax_rate * 100000)
 
     # Pricing indicator and percentage
