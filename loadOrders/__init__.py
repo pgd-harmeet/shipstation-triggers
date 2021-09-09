@@ -2,6 +2,7 @@ import logging
 import os
 import azure.functions as func
 from azure.storage.blob.aio import BlobClient
+from azure.storage.blob.aio import ContainerClient
 import datetime
 import re
 import requests
@@ -20,17 +21,15 @@ async def main(req: func.HttpRequest):
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
-    order_info = order_info.json()
+    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
     logging.info(f'Creating order sheet for {order_info["shipments"][0]["orderKey"]}')
     order_sheet = generate_order_sheet(order_info)
 
-    blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
-        container_name='eagle-orders',
-        blob_name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt')
+    now = str(datetime.datetime.strptime(datetime.datetime.now(), '%m-%d-%Y'))
 
-    await blob.upload_blob(order_sheet)
-    await blob.close()
+    container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='EagleOrders-' + now)
+    await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    await container.close()
 
     return func.HttpResponse('Successfully created Eagle order sheet')
 
