@@ -99,8 +99,8 @@ def _generate_header(order_info):
             if item_tax is not None:
                 tax_total += item['taxAmount']
             else:
-                tax_total += '0'
-        
+                tax_total += 0
+
         total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
 
         header += normalize_value(total_sales_tax, 7 ,2)
@@ -233,7 +233,7 @@ def _generate_details(order_info):
 
     return detail
 
-def normalize_value(value, integar_part, frac_part, signed=True):
+def normalize_value(value, integar_part, frac_part, signed=True) -> str:
     """
     Normalizes monetary value so that it conforms to Eagle's number formatting
     system wherein the number of spots before and after an implied decimal are given
