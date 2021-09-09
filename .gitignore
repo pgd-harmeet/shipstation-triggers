@@ -2,6 +2,7 @@ bin
 obj
 csx
 .vs
+.vscode
 edge
 Publish
 
@@ -41,7 +42,4 @@ venv.bak/
 __pycache__/
 *.py[cod]
 *$py.class
-.vscode/extensions.json
-.vscode/launch.json
-.vscode/settings.json
-.vscode/tasks.json
+test_order.py
