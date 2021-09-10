@@ -27,6 +27,7 @@ async def main(req: func.HttpRequest):
     now = datetime.date.today().strftime('%m-%d-%Y')
 
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='EagleOrders-' + now)
+    logging.info('File name: ' + str(order_info['shipments'][0]['orderId']))
     await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
     await container.close()
 
