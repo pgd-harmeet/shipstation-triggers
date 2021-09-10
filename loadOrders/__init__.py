@@ -24,11 +24,12 @@ async def main(req: func.HttpRequest):
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
     logging.info(f'Creating order sheet for {order_info["shipments"][0]["orderKey"]}')
     order_sheet = generate_order_sheet(order_info)
-    now = datetime.date.today().strftime('%m-%d-%Y')
+    today = datetime.date.today().strftime('%m-%d-%Y')
 
-    container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='EagleOrders-' + now)
+    container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='EagleOrders-' + today)
     logging.info('File name: ' + str(order_info['shipments'][0]['orderId']))
-    await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    blob = await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    await blob.close()
     await container.close()
 
     return func.HttpResponse('Successfully created Eagle order sheet')
