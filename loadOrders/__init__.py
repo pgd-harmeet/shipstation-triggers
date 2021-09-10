@@ -12,7 +12,7 @@ async def main(req: func.HttpRequest):
     try:
         req = req.get_json()
         resource_url = req['resource_url']
-        logging.info[resource_url]
+        logging.info(resource_url)
         resource_type = req['resource_type']
     except (ValueError, KeyError):
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
@@ -22,12 +22,12 @@ async def main(req: func.HttpRequest):
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
+    order_info = requests.get(resource_url, None, headers={'Authorization': 'Basic M2I3MmUyOGI0ZWI1NDdhYjk3NmNjMGFjOGIxYTA2NjI6ZmUyYmJjNjRkN2RlNDI2YzhjMjk4YjQxMDdkYWM2MGE='}).json()
     logging.info(f'Creating order sheet for {order_info["shipments"][0]["orderKey"]}')
     order_sheet = generate_order_sheet(order_info)
     today = datetime.date.today().strftime('%m-%d-%Y')
 
-    container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
+    container = ContainerClient.from_connection_string(conn_str='DefaultEndpointsProtocol=https;AccountName=gdshipstation;AccountKey=LoQ7ZFVaE/F+s2+Rdz5PU3F9pUIZvOSieE2RfaiJIwADQZC/7mSNW5hdpo5yTJQ0eM9lPHylGQXo2SyzEx0iLg==;EndpointSuffix=core.windows.net', container_name='eagle-' + today)
     container.create_container()
     logging.info('File name: ' + str(order_info['shipments'][0]['orderId']))
     blob = await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
