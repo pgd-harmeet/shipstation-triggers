@@ -12,6 +12,7 @@ async def main(req: func.HttpRequest):
     try:
         req = req.get_json()
         resource_url = req['resource_url']
+        logging.info[resource_url]
         resource_type = req['resource_type']
     except (ValueError, KeyError):
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
