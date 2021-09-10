@@ -7,12 +7,10 @@ import datetime
 import re
 import requests
 
-async def main(req: func.HttpRequest):
-    logging.info('Processing an order from ShipStation')
+async def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         req = req.get_json()
         resource_url = req['resource_url']
-        logging.info(resource_url)
         resource_type = req['resource_type']
     except (ValueError, KeyError):
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
@@ -22,21 +20,22 @@ async def main(req: func.HttpRequest):
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = requests.get(resource_url, None, headers={'Authorization': 'Basic M2I3MmUyOGI0ZWI1NDdhYjk3NmNjMGFjOGIxYTA2NjI6ZmUyYmJjNjRkN2RlNDI2YzhjMjk4YjQxMDdkYWM2MGE='}).json()
-    logging.info(f'Creating order sheet for {order_info["shipments"][0]["orderKey"]}')
+    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
+    logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
     order_sheet = generate_order_sheet(order_info)
     today = datetime.date.today().strftime('%m-%d-%Y')
 
-    container = ContainerClient.from_connection_string(conn_str='DefaultEndpointsProtocol=https;AccountName=gdshipstation;AccountKey=LoQ7ZFVaE/F+s2+Rdz5PU3F9pUIZvOSieE2RfaiJIwADQZC/7mSNW5hdpo5yTJQ0eM9lPHylGQXo2SyzEx0iLg==;EndpointSuffix=core.windows.net', container_name='eagle-' + today)
-    container.create_container()
-    logging.info('File name: ' + str(order_info['shipments'][0]['orderId']))
-    blob = await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
-    await blob.close()
+    container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
+    if not container.exists():
+        await container.create_container()
+
+    # Upload and close container
+    await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
     await container.close()
 
-    return func.HttpResponse('Successfully created Eagle order sheet')
+    return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
 
-def generate_order_sheet(order):
+def generate_order_sheet(order: dict)-> str:
     order_data = order['shipments'][0]
 
     header = _generate_header(order_data)
@@ -44,7 +43,7 @@ def generate_order_sheet(order):
 
     return header + '\n' + details
 
-def _generate_header(order_info):
+def _generate_header(order_info: dict) -> str:
     """
     Generates a header entry for an order
     """
@@ -192,7 +191,7 @@ def _generate_header(order_info):
 
     return header
 
-def _generate_details(order_info):
+def _generate_details(order_info: dict) -> str:
     """
     Generates a detail entry for each item in the order
     """
@@ -235,7 +234,7 @@ def _generate_details(order_info):
 
     return detail
 
-def normalize_value(value, integar_part, frac_part, signed=True) -> str:
+def normalize_value(value: int or float, integar_part: int, frac_part: int, signed=True) -> str:
     """
     Normalizes monetary value so that it conforms to Eagle's number formatting
     system wherein the number of spots before and after an implied decimal are given
