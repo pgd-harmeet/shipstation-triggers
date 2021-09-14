@@ -12,6 +12,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         req = req.get_json()
         resource_url = req['resource_url']
         resource_type = req['resource_type']
+        logging.info(f'RESOURCE URL: ${resource_url}')
     except (ValueError, KeyError):
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
 
@@ -65,13 +66,11 @@ def _generate_header(order_info: dict) -> str:
     header += ' ' * 3
 
     # Tax rate charged
-    tax_amount = order_info['shipmentItems'][0]['taxAmount']
+    tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
     unit_price = order_info['shipmentItems'][0]['unitPrice']
     quantity_ordered = order_info['shipmentItems'][0]['quantity']
     logging.info(f'{tax_amount}, {unit_price}, {quantity_ordered}')
 
-    if tax_amount is None:
-        tax_amount = 0
     tax_rate = tax_amount / quantity_ordered / unit_price
     header += '0' + str(int(tax_rate * 100000))
 
