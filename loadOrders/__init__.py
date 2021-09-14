@@ -68,7 +68,7 @@ def _generate_header(order_info: dict) -> str:
     tax_amount = order_info['shipmentItems'][0]['taxAmount']
     unit_price = order_info['shipmentItems'][0]['unitPrice']
     quantity_ordered = order_info['shipmentItems'][0]['quantity']
-    logging.info(tax_amount, unit_price, quantity_ordered)
+    logging.info(f'{tax_amount}, {unit_price}, {quantity_ordered}')
 
     if tax_amount is None:
         tax_amount = 0
