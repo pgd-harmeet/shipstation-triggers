@@ -26,7 +26,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     today = datetime.date.today().strftime('%m-%d-%Y')
 
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
-    if not container.exists():
+    if not await container.exists():
         await container.create_container()
 
     # Upload and close container
