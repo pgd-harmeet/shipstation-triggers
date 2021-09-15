@@ -1,7 +1,6 @@
 import logging
 import os
 import azure.functions as func
-from azure.storage.blob.aio import BlobClient
 from azure.storage.blob.aio import ContainerClient
 import datetime
 import re
@@ -261,6 +260,8 @@ def normalize_value(value: int or float, integar_part: int, frac_part: int, sign
             sign = '-'
         else :
             sign = '+'
-    value = int(value * 100)
+
+    value = str(int(value * 10 ** frac_part))
+    field_length = integar_part + frac_part
     value = str(value) + '0' * (frac_part - 2)
-    return '0' * ((integar_part + frac_part) - len(value)) + value + sign
+    return '0' * (field_length - len(value)) + value + sign
