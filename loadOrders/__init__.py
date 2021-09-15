@@ -71,7 +71,7 @@ def _generate_header(order_info: dict) -> str:
     logging.info(f'{tax_amount}, {unit_price}, {quantity_ordered}')
 
     tax_rate = tax_amount / quantity_ordered / unit_price
-    header += '0' + str(int(tax_rate * 100000))
+    header += normalize_value(tax_rate, 0, 5, signed=False)
 
     # Pricing indicator and percentage
     header += 'R0000'
@@ -103,7 +103,7 @@ def _generate_header(order_info: dict) -> str:
 
         total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
 
-        header += normalize_value(total_sales_tax, 7 ,2)
+        header += normalize_value(total_sales_tax, 7, 2)
 
     # Always blank lines
     header += ' ' * 10
@@ -233,7 +233,7 @@ def _generate_details(order_info: dict) -> str:
 
     return detail
 
-def normalize_value(value: int or float, integar_part: int, frac_part: int, signed=True) -> str:
+def normalize_value(value: float, integar_part: int, frac_part: int, signed=True) -> str:
     """
     Normalizes monetary value so that it conforms to Eagle's number formatting
     system wherein the number of spots before and after an implied decimal are given
