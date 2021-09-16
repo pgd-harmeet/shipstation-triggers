@@ -2,6 +2,7 @@ import logging
 import os
 import azure.functions as func
 from azure.storage.blob.aio import ContainerClient
+from azure.core.exceptions import ResourceExistsError
 import datetime
 import re
 import requests
@@ -22,7 +23,10 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
     logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
-    order_sheet = generate_order_sheet(order_info)
+    try:
+        order_sheet = generate_order_sheet(order_info)
+    except ValueError:
+        return func.HttpResponse('The requested order has an item that does not have either a nonzero unit price or quantity', status_code=400)
     today = datetime.date.today().strftime('%m-%d-%Y')
 
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
@@ -30,7 +34,10 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         await container.create_container()
 
     # Upload and close container
-    await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    try:
+        await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    except ResourceExistsError:
+        return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
     await container.close()
 
     return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
@@ -70,7 +77,10 @@ def _generate_header(order_info: dict) -> str:
     quantity_ordered = order_info['shipmentItems'][0]['quantity']
     logging.info(f'{tax_amount}, {unit_price}, {quantity_ordered}')
 
-    tax_rate = tax_amount / quantity_ordered / unit_price
+    try:
+        tax_rate = tax_amount / quantity_ordered / unit_price
+    except ZeroDivisionError:
+        raise ValueError()
     header += normalize_value(tax_rate, 0, 5, signed=False)
 
     # Pricing indicator and percentage
