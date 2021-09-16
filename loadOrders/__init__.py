@@ -14,10 +14,12 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         resource_type = req['resource_type']
         logging.info(f'RESOURCE URL: ${resource_url}')
     except (ValueError, KeyError):
+        logging.error('No JSON body or "resource_url" and "resource_type" keys not present')
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
 
     if (resource_type != 'SHIP_NOTIFY'):
-        return func.HttpResponse(f'This is not an "on items shipped" webhook', status_code=400)
+        logging.error('Request is not for an "on items shipped webhook"')
+        return func.HttpResponse('This is not an "on items shipped" webhook', status_code=400)
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
@@ -26,7 +28,8 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         order_sheet = generate_order_sheet(order_info)
     except ValueError:
-        return func.HttpResponse('The requested order has an item that does not have either a nonzero unit price or quantity', status_code=400)
+        logging.info('The order has an item that does not have either a nonzero unit price or quantity')
+        return func.HttpResponse('The order has an item that does not have either a nonzero unit price or quantity', status_code=400)
     today = datetime.date.today().strftime('%m-%d-%Y')
 
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
@@ -37,6 +40,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
     except ResourceExistsError:
+        logging.info(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
         return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
     await container.close()
 
