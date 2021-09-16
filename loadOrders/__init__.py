@@ -28,8 +28,8 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         order_sheet = generate_order_sheet(order_info)
     except ValueError:
-        logging.info('The order has an item that does not have either a nonzero unit price or quantity')
-        return func.HttpResponse('The order has an item that does not have either a nonzero unit price or quantity', status_code=400)
+        logging.info('The order has an item that does not have either a nonzero unit price or quantity, most likely a replacement item')
+        return func.HttpResponse('The order has an item that does not have either a nonzero unit price or quantity, most likely a replacement item', status_code=400)
     today = datetime.date.today().strftime('%m-%d-%Y')
 
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
@@ -40,10 +40,11 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
     except ResourceExistsError:
-        logging.info(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
+        logging.warning(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
         return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
     await container.close()
 
+    logging.info(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}')
     return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
 
 def generate_order_sheet(order: dict)-> str:
