@@ -1,8 +1,8 @@
 import logging
 import os
 import azure.functions as func
-from azure.storage.blob.aio import BlobClient
 from azure.storage.blob.aio import ContainerClient
+from azure.core.exceptions import ResourceExistsError
 import datetime
 import re
 import requests
@@ -12,27 +12,41 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         req = req.get_json()
         resource_url = req['resource_url']
         resource_type = req['resource_type']
+        logging.info(f'RESOURCE URL: ${resource_url}')
     except (ValueError, KeyError):
+        logging.error('No JSON body or "resource_url" and "resource_type" keys not present')
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
 
     if (resource_type != 'SHIP_NOTIFY'):
-        return func.HttpResponse(f'This is not an "on items shipped" webhook', status_code=400)
+        logging.error('Request is not for an "on items shipped webhook"')
+        return func.HttpResponse('This is not an "on items shipped" webhook', status_code=400)
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
-    logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
-    order_sheet = generate_order_sheet(order_info)
-    today = datetime.date.today().strftime('%m-%d-%Y')
 
+
+    try:
+        logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
+        order_sheet = generate_order_sheet(order_info)
+    except ValueError as e:
+        logging.info(str(e))
+        return func.HttpResponse(str(e), status_code=400)
+
+    today = datetime.date.today().strftime('%m-%d-%Y')
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
-    if not container.exists():
+    if not await container.exists():
         await container.create_container()
 
     # Upload and close container
-    await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    try:
+        await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    except ResourceExistsError:
+        logging.warning(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
+        return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
     await container.close()
 
+    logging.info(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}')
     return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
 
 def generate_order_sheet(order: dict)-> str:
@@ -64,15 +78,24 @@ def _generate_header(order_info: dict) -> str:
     # MTX tax code
     header += ' ' * 3
 
+    # TODO Remove this once ShipStation fixes issues with bad resource_url
+    """
+    # ShipStation sometimes gives a resource_url that points to no order
+    if order_info['shipmentItems'] is None:
+        raise ValueError('This order has no shipment items')
+    """
+
     # Tax rate charged
-    tax_amount = order_info['shipmentItems'][0]['taxAmount']
+    tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
     unit_price = order_info['shipmentItems'][0]['unitPrice']
     quantity_ordered = order_info['shipmentItems'][0]['quantity']
+    logging.info(f'{tax_amount}, {unit_price}, {quantity_ordered}')
 
-    if tax_amount is None:
-        tax_amount = 0
-    tax_rate = tax_amount / quantity_ordered / unit_price
-    header += '0' + str(int(tax_rate * 100000))
+    try:
+        tax_rate = tax_amount / quantity_ordered / unit_price
+    except ZeroDivisionError:
+        raise ValueError('Quantity ordered or unit price is not a number greater than 0')
+    header += normalize_value(tax_rate, 0, 5, signed=False)
 
     # Pricing indicator and percentage
     header += 'R0000'
@@ -104,7 +127,7 @@ def _generate_header(order_info: dict) -> str:
 
         total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
 
-        header += normalize_value(total_sales_tax, 7 ,2)
+        header += normalize_value(total_sales_tax, 7, 2)
 
     # Always blank lines
     header += ' ' * 10
@@ -234,18 +257,19 @@ def _generate_details(order_info: dict) -> str:
 
     return detail
 
-def normalize_value(value: int or float, integar_part: int, frac_part: int, signed=True) -> str:
+def normalize_value(value: float, integar_part: int, frac_part: int, signed=True) -> str:
     """
     Normalizes monetary value so that it conforms to Eagle's number formatting
     system wherein the number of spots before and after an implied decimal are given
     Returns a signed number by default
 
+    9 indicates an integer value from 0-9
     v is the implied decimal spot
 
     For a given value $112.40:
-    9(4)v9(3) gives 0112400
-    9(4)v9(3)+ gives 011240+
-    9(5)v9(3) gives 00112400
+    9(4)v9(3) (4 integers -> implied decimal -> 3 integers) gives 0112400
+    9(4)v9(3)+ (4 integers -> implied decimal -> 3 integers -> +) gives 011240+
+    9(5)v9(3) (5 integers -> implied decimal -> 3 integers) gives 00112400
 
 
     :param value: Value to be normalized
@@ -261,6 +285,8 @@ def normalize_value(value: int or float, integar_part: int, frac_part: int, sign
             sign = '-'
         else :
             sign = '+'
-    value = int(value * 100)
+
+    value = str(int(value * 10 ** frac_part))
+    field_length = integar_part + frac_part
     value = str(value) + '0' * (frac_part - 2)
-    return '0' * ((integar_part + frac_part) - len(value)) + value + sign
+    return '0' * (field_length - len(value)) + value + sign
