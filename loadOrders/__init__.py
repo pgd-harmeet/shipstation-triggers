@@ -254,12 +254,13 @@ def normalize_value(value: float, integar_part: int, frac_part: int, signed=True
     system wherein the number of spots before and after an implied decimal are given
     Returns a signed number by default
 
+    9 indicates an integer value from 0-9
     v is the implied decimal spot
 
     For a given value $112.40:
-    9(4)v9(3) gives 0112400
-    9(4)v9(3)+ gives 011240+
-    9(5)v9(3) gives 00112400
+    9(4)v9(3) (4 integers -> implied decimal -> 3 integers) gives 0112400
+    9(4)v9(3)+ (4 integers -> implied decimal -> 3 integers -> +) gives 011240+
+    9(5)v9(3) (5 integers -> implied decimal -> 3 integers) gives 00112400
 
 
     :param value: Value to be normalized
