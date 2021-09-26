@@ -23,13 +23,16 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
-
+    order_info = await requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
 
     try:
         logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
         order_sheet = generate_order_sheet(order_info)
+    except IndexError as e:
+        logging.info('The batch ID for this resource_url has no shipments associated with it')
+        return func.HttpResponse('The batch ID for this resource_url has no shipments associated with it', status_code=422)
     except ValueError as e:
+        # Order contains items with either a quantity ordered or unit price that is <= 0, usually for replacement orders
         logging.info(str(e))
         return func.HttpResponse(str(e), status_code=400)
 
@@ -50,6 +53,12 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
 
 def generate_order_sheet(order: dict)-> str:
+    """
+    Generates an order sheet
+
+    :param order: dict containing a set of orders for a batch ID
+    :return: str that contains order information in Eagle format
+    """
     order_data = order['shipments'][0]
 
     header = _generate_header(order_data)
@@ -60,6 +69,10 @@ def generate_order_sheet(order: dict)-> str:
 def _generate_header(order_info: dict) -> str:
     """
     Generates a header entry for an order
+
+    :param order_info: dict containing information for a singular order
+    :raise ValueError: Quantity ordered or the unit price of an item is <= 0, usually happens for replacement orders
+    :return: str containing header details for an Eagle order
     """
     # Initialize header
     header = 'H'
@@ -77,13 +90,6 @@ def _generate_header(order_info: dict) -> str:
 
     # MTX tax code
     header += ' ' * 3
-
-    # TODO Remove this once ShipStation fixes issues with bad resource_url
-    """
-    # ShipStation sometimes gives a resource_url that points to no order
-    if order_info['shipmentItems'] is None:
-        raise ValueError('This order has no shipment items')
-    """
 
     # Tax rate charged
     tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
@@ -259,7 +265,7 @@ def _generate_details(order_info: dict) -> str:
 
 def normalize_value(value: float, integar_part: int, frac_part: int, signed=True) -> str:
     """
-    Normalizes monetary value so that it conforms to Eagle's number formatting
+    Normalizes a numeric value so that it conforms to Eagle's number formatting
     system wherein the number of spots before and after an implied decimal are given
     Returns a signed number by default
 
