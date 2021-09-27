@@ -23,7 +23,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = await requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
+    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
 
     try:
         logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
