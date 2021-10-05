@@ -72,6 +72,7 @@ def _generate_header(order_info: dict) -> str:
 
     :param order_info: dict containing information for a singular order
     :raise ValueError: Quantity ordered or the unit price of an item is <= 0, usually happens for replacement orders
+    :raise ValueError: The shipment has no shipment items associated with it, most likely due to a manual order
     :return: str containing header details for an Eagle order
     """
     # Initialize header
@@ -92,10 +93,12 @@ def _generate_header(order_info: dict) -> str:
     header += ' ' * 3
 
     # Tax rate charged
-    tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
-    unit_price = order_info['shipmentItems'][0]['unitPrice']
-    quantity_ordered = order_info['shipmentItems'][0]['quantity']
-    logging.info(f'{tax_amount}, {unit_price}, {quantity_ordered}')
+    try:
+        tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
+        unit_price = order_info['shipmentItems'][0]['unitPrice']
+        quantity_ordered = order_info['shipmentItems'][0]['quantity']
+    except TypeError:
+        raise ValueError('The shipment has no shipment items associated with it')
 
     try:
         tax_rate = tax_amount / quantity_ordered / unit_price
