@@ -141,8 +141,10 @@ def _generate_header(order_info: dict) -> str:
     # Always blank lines
     header += ' ' * 10
 
-    # TODO: Instructions 1
-    header += ' ' * 30
+    # Instructions 1
+    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payment/{order_info['orderNumber']}").json()
+    instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
+    header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
 
     # Instructions 2
     header += order_num + ' ' * (30 - len(order_num))
