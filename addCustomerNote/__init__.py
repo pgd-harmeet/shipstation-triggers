@@ -26,7 +26,10 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
 
     wsi_orders = []
     for order in orders["orders"]:
-        if check_order(order, wsi_tag_id): wsi_orders.append(order)
+        try:
+            if check_order(order, wsi_tag_id): wsi_orders.append(order)
+        except ValueError:
+            return func.HttpResponse("The order has no tags assocaited with it", status_code=400, mimetype="text/plain")
 
     if len(wsi_orders) == 0:
         return func.HttpResponse(f"Could not find an order with a WSI tag", status_code=400, mimetype="text/plain")
@@ -68,6 +71,8 @@ def check_order(order: dict, tag: int) -> bool:
     @param tag: int that is the tag ID of the tag to look for
     @return: bool that is true if the order contains a matching tag
     """
+    if order["tagIds"] is None:
+        raise ValueError("The order has no associated tags")
     for tag in order["tagIds"]:
         if tag == tag:
             return True
