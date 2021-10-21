@@ -14,7 +14,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     orders = requests.get(f"https://ssapi4.shipstation.com/orders?orderNumber={req.params['orderNumber']}",
         headers={"Authorization": os.environ.get("AUTH_CREDS")}).json()
 
-    tags = requests.get(f"https://ssapi.shipstation.com/accounts/listtags").json()
+    tags = requests.get(f"https://ssapi.shipstation.com/accounts/listtags", headers={"Authorization": os.environ.get("AUTH_CREDS")}).json()
 
     for tag in tags:
         if tag["name"] == "WSI":
