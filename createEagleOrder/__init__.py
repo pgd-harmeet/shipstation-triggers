@@ -1,3 +1,8 @@
+"""
+Creates an Eagle order sheet to be inserted into the Eagle system for inventory tracking
+Uses the structure specified in d112-021 ESTU format.doc
+"""
+
 import logging
 import os
 import azure.functions as func
