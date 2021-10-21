@@ -33,7 +33,9 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse('The batch ID for this resource_url has no shipments associated with it', status_code=422)
     except ValueError as e:
         # Order contains items with either a quantity ordered or unit price that is <= 0, usually for replacement orders
-        logging.info(str(e))
+        traceback = e.__traceback__
+        while traceback:
+            logging.info(f"{traceback.tb_frame.f_code.co_filename}: {traceback.tb_lineno}")
         return func.HttpResponse(str(e), status_code=400)
 
     today = datetime.date.today().strftime('%m-%d-%Y')
