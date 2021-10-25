@@ -1,40 +1,71 @@
+"""
+Creates an Eagle order sheet to be inserted into the Eagle system for inventory tracking
+Uses the structure specified in d112-021 ESTU format.doc
+"""
+
 import logging
 import os
 import azure.functions as func
-from azure.storage.blob.aio import BlobClient
+from azure.storage.blob.aio import ContainerClient
+from azure.core.exceptions import ResourceExistsError
 import datetime
 import re
 import requests
 
-async def main(req: func.HttpRequest):
-    logging.info('Processing an order from ShipStation')
+async def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         req = req.get_json()
         resource_url = req['resource_url']
         resource_type = req['resource_type']
+        logging.info(f'RESOURCE URL: ${resource_url}')
     except (ValueError, KeyError):
+        logging.error('No JSON body or "resource_url" and "resource_type" keys not present')
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
 
     if (resource_type != 'SHIP_NOTIFY'):
-        return func.HttpResponse(f'This is not an "on items shipped" webhook', status_code=400)
+        logging.error('Request is not for an "on items shipped webhook"')
+        return func.HttpResponse('This is not an "on items shipped" webhook', status_code=400)
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
-    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']})
-    order_info = order_info.json()
-    logging.info(f'Creating order sheet for {order_info["shipments"][0]["orderKey"]}')
-    order_sheet = generate_order_sheet(order_info)
+    order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
 
-    blob = BlobClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'],
-        container_name='eagle-orders',
-        blob_name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt')
+    try:
+        logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
+        order_sheet = generate_order_sheet(order_info)
+    except IndexError as e:
+        logging.info('The batch ID for this resource_url has no shipments associated with it')
+        return func.HttpResponse('The batch ID for this resource_url has no shipments associated with it', status_code=422)
+    except ValueError as e:
+        # Order contains items with either a quantity ordered or unit price that is <= 0, usually for replacement orders
+        traceback = e.__traceback__
+        while traceback:
+            logging.info(f"{traceback.tb_frame.f_code.co_filename}: {traceback.tb_lineno}")
+        return func.HttpResponse(str(e), status_code=400)
 
-    await blob.upload_blob(order_sheet)
-    await blob.close()
+    today = datetime.date.today().strftime('%m-%d-%Y')
+    container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
+    if not await container.exists():
+        await container.create_container()
 
-    return func.HttpResponse('Successfully created Eagle order sheet')
+    # Upload and close container
+    try:
+        await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+    except ResourceExistsError:
+        logging.warning(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
+        return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
+    await container.close()
 
-def generate_order_sheet(order):
+    logging.info(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}')
+    return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
+
+def generate_order_sheet(order: dict)-> str:
+    """
+    Generates an order sheet
+
+    :param order: dict containing a set of orders for a batch ID
+    :return: str that contains order information in Eagle format
+    """
     order_data = order['shipments'][0]
 
     header = _generate_header(order_data)
@@ -42,9 +73,14 @@ def generate_order_sheet(order):
 
     return header + '\n' + details
 
-def _generate_header(order_info):
+def _generate_header(order_info: dict) -> str:
     """
     Generates a header entry for an order
+
+    :param order_info: dict containing information for a singular order
+    :raise ValueError: Quantity ordered or the unit price of an item is <= 0, usually happens for replacement orders
+    :raise ValueError: The shipment has no shipment items associated with it, most likely due to a manual order
+    :return: str containing header details for an Eagle order
     """
     # Initialize header
     header = 'H'
@@ -64,14 +100,18 @@ def _generate_header(order_info):
     header += ' ' * 3
 
     # Tax rate charged
-    tax_amount = order_info['shipmentItems'][0]['taxAmount']
-    unit_price = order_info['shipmentItems'][0]['unitPrice']
-    quantity_ordered = order_info['shipmentItems'][0]['quantity']
+    try:
+        tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
+        unit_price = order_info['shipmentItems'][0]['unitPrice']
+        quantity_ordered = order_info['shipmentItems'][0]['quantity']
+    except TypeError:
+        raise ValueError('The shipment has no shipment items associated with it')
 
-    if tax_amount is None:
-        tax_amount = 0
-    tax_rate = tax_amount / quantity_ordered / unit_price
-    header += '0' + str(int(tax_rate * 100000))
+    try:
+        tax_rate = tax_amount / quantity_ordered / unit_price
+    except ZeroDivisionError:
+        raise ValueError('Quantity ordered or unit price is not a number greater than 0')
+    header += normalize_value(tax_rate, 0, 5, signed=False)
 
     # Pricing indicator and percentage
     header += 'R0000'
@@ -103,13 +143,15 @@ def _generate_header(order_info):
 
         total_sales_tax = 1000 * (tax_total / (subtotal + order_info['shipmentCost']))
 
-        header += normalize_value(total_sales_tax, 7 ,2)
+        header += normalize_value(total_sales_tax, 7, 2)
 
     # Always blank lines
     header += ' ' * 10
 
-    # TODO: Instructions 1
-    header += ' ' * 30
+    # Instructions 1
+    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payment/{order_info['orderNumber']}").json()
+    instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
+    header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
 
     # Instructions 2
     header += order_num + ' ' * (30 - len(order_num))
@@ -190,7 +232,7 @@ def _generate_header(order_info):
 
     return header
 
-def _generate_details(order_info):
+def _generate_details(order_info: dict) -> str:
     """
     Generates a detail entry for each item in the order
     """
@@ -233,18 +275,19 @@ def _generate_details(order_info):
 
     return detail
 
-def normalize_value(value, integar_part, frac_part, signed=True) -> str:
+def normalize_value(value: float, integar_part: int, frac_part: int, signed=True) -> str:
     """
-    Normalizes monetary value so that it conforms to Eagle's number formatting
+    Normalizes a numeric value so that it conforms to Eagle's number formatting
     system wherein the number of spots before and after an implied decimal are given
     Returns a signed number by default
 
+    9 indicates an integer value from 0-9
     v is the implied decimal spot
 
     For a given value $112.40:
-    9(4)v9(3) gives 0112400
-    9(4)v9(3)+ gives 011240+
-    9(5)v9(3) gives 00112400
+    9(4)v9(3) (4 integers -> implied decimal -> 3 integers) gives 0112400
+    9(4)v9(3)+ (4 integers -> implied decimal -> 3 integers -> +) gives 011240+
+    9(5)v9(3) (5 integers -> implied decimal -> 3 integers) gives 00112400
 
 
     :param value: Value to be normalized
@@ -260,6 +303,8 @@ def normalize_value(value, integar_part, frac_part, signed=True) -> str:
             sign = '-'
         else :
             sign = '+'
-    value = int(value * 100)
+
+    value = str(int(value * 10 ** frac_part))
+    field_length = integar_part + frac_part
     value = str(value) + '0' * (frac_part - 2)
-    return '0' * ((integar_part + frac_part) - len(value)) + value + sign
+    return '0' * (field_length - len(value)) + value + sign
