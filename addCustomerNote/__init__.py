@@ -9,22 +9,20 @@ import requests
 import logging
 
 
-async def main(msg: func.QueueMessage) -> func.HttpResponse:
+async def main(msg: func.QueueMessage) -> None:
     order_number = msg.get_body().decode("utf-8")
     session = requests.Session()
     session.headers = {"Authorization": os.environ.get("AUTH_CREDS")}
 
     try:
         wsi_tag_id = get_wsi_tag(session)
-    except AssertionError as e:
+    except AssertionError:
         logging.error("A tag with the name WSI does not exist")
-        return func.HttpResponse("A tag with the name WSI does not exist", status_code=400)
 
     orders = session.get(f"https://ssapi4.shipstation.com/orders?orderNumber={order_number}").json()
 
     if orders["total"] < 1:
         logging.warn(f"There are no orders for {order_number}")
-        return func.HttpResponse(f"There are no orders for {order_number}", status_code=400)
 
     wsi_orders = []
     for order in orders["orders"]:
@@ -35,7 +33,6 @@ async def main(msg: func.QueueMessage) -> func.HttpResponse:
 
     if len(wsi_orders) == 0:
         logging.warn("There were no orders with a WSI tag")
-        return func.HttpResponse("There were no orders with a WSI tag", status_code=400)
 
     for order in wsi_orders:
         order["customerNotes"] = "Sent to WSI"
@@ -43,12 +40,10 @@ async def main(msg: func.QueueMessage) -> func.HttpResponse:
 
         if note_post.status_code != 200:
             logging.error("There was an issue adding a note to an order")
-            return func.HttpResponse("There was an issue adding a note to an order", status_code=400)
 
     session.close()
 
     logging.info(f"Successfully added a note to order {order_number}")
-    return func.HttpResponse(f"Successfully added a note to order {order_number}", status_code=200)
 
 def get_wsi_tag(session: requests.Session()) -> int:
     """
