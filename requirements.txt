@@ -3,4 +3,5 @@
 azure-functions
 pandas
 azure-storage-blob
+azure-storage-queue
 aiohttp
