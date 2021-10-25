@@ -24,8 +24,8 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
 
     if (resource_type != 'SHIP_NOTIFY'):
-        logging.error('Request is not for an "on items shipped webhook"')
-        return func.HttpResponse('This is not an "on items shipped" webhook', status_code=400)
+        logging.error('Request is not for an "on order shipped" webhook')
+        return func.HttpResponse('Request is not for an "on order shipped" webhook', status_code=400)
 
     # Makes the response include items that were shipped with that order
     resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
@@ -150,7 +150,7 @@ def _generate_header(order_info: dict) -> str:
     header += ' ' * 10
 
     # Instructions 1
-    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payment/{order_info['orderNumber']}").json()
+    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{order_info['orderNumber']}").json()
     instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
     header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
 
