@@ -7,6 +7,11 @@
       "direction": "in",
       "queueName": "customer-notes",
       "connection": "AzureWebJobsStorage"
+    },
+    {
+      "type": "http",
+      "direction": "in",
+      "name": "$return"
     }
   ]
 }
