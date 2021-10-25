@@ -17,8 +17,7 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         req = req.get_json()
         resource_url = req['resource_url']
         resource_type = req['resource_type']
-        logging.info(f'RESOURCE URL: {resource_url}')
-        logging.info(f"RESOUCE TYPE: {resource_type}")
+        logging.debug(f'RESOURCE URL: {resource_url}')
     except (ValueError, KeyError):
         logging.error('No JSON body or "resource_url" and "resource_type" keys not present')
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
@@ -55,7 +54,8 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
     except ResourceExistsError:
         logging.warning(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
         return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
-    await container.close()
+    finally:
+        await container.close()
 
     logging.info(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}')
     return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
@@ -150,7 +150,8 @@ def _generate_header(order_info: dict) -> str:
     header += ' ' * 10
 
     # Instructions 1
-    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{order_info['orderNumber']}").json()
+    base_order_num = re.match(r'.+?(?=_)', order_info['orderNumber']).group()
+    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{base_order_num}").json()
     instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
     header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
 
