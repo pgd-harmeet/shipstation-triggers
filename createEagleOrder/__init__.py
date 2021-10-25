@@ -17,7 +17,8 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         req = req.get_json()
         resource_url = req['resource_url']
         resource_type = req['resource_type']
-        logging.info(f'RESOURCE URL: ${resource_url}')
+        logging.info(f'RESOURCE URL: {resource_url}')
+        logging.info(f"RESOUCE TYPE: {resource_type}")
     except (ValueError, KeyError):
         logging.error('No JSON body or "resource_url" and "resource_type" keys not present')
         return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
