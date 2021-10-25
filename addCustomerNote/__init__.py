@@ -9,7 +9,7 @@ import requests
 import logging
 
 
-async def main(msg: func.QueueMessage) -> None:
+async def main(msg: func.QueueMessage) -> func.HttpResponse:
     order_number = msg.get_body().decode("utf-8")
     session = requests.Session()
     session.headers = {"Authorization": os.environ.get("AUTH_CREDS")}
