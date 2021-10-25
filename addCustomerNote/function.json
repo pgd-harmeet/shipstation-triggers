@@ -10,7 +10,7 @@
     },
     {
       "type": "http",
-      "direction": "in",
+      "direction": "out",
       "name": "$return"
     }
   ]
