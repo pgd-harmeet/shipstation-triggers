@@ -150,7 +150,9 @@ def _generate_header(order_info: dict) -> str:
     header += ' ' * 10
 
     # Instructions 1
-    base_order_num = re.match(r'.+?(?=_)', order_info['orderNumber']).group()
+    base_order_num = order_info['orderNumber']
+    if base_order_num.find('_') == -1:
+        base_order_num = re.match(r'.+?(?=_)', base_order_num).group()
     payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{base_order_num}").json()
     instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
     header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
