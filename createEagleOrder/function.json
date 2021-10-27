@@ -2,20 +2,11 @@
   "scriptFile": "__init__.py",
   "bindings": [
     {
-      "authLevel": "Anonymous",
-      "type": "httpTrigger",
+      "type": "queueTrigger",
       "direction": "in",
-      "name": "req",
+      "name": "msg",
       "connection": "AzureWebJobsStorage",
-      "methods": [
-        "post"
-      ]
-    },
-    {
-      "type": "http",
-      "direction": "out",
-      "name": "$return",
-      "connection": "AzureWebJobsStorage"
+      "queueName": "eagle-orders"
     }
   ]
 }

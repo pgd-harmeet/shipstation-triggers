@@ -1,67 +1,36 @@
 """
-Creates an Eagle order sheet to be inserted into the Eagle system for inventory tracking
-Uses the structure specified in d112-021 ESTU format.doc
+Creates an Eagle order sheet to be inserted into the Eagle system for inventory tracking.
+Uses the structure specified in d112-021 ESTU format.doc.
 """
 
-import logging
-import os
 import azure.functions as func
 from azure.storage.blob.aio import ContainerClient
 from azure.core.exceptions import ResourceExistsError
 import datetime
+import logging
+import os
 import re
 import requests
 
-async def main(req: func.HttpRequest) -> func.HttpResponse:
-    try:
-        req = req.get_json()
-        resource_url = req['resource_url']
-        resource_type = req['resource_type']
-        logging.info(f'RESOURCE URL: {resource_url}')
-    except (ValueError, KeyError):
-        logging.error('No JSON body or "resource_url" and "resource_type" keys not present')
-        return func.HttpResponse('Please submit a JSON body with your request with keys "resource_url" and "resource_type"', status_code=400)
-
-    if (resource_type != 'SHIP_NOTIFY'):
-        logging.error('Request is not for an "on order shipped" webhook')
-        return func.HttpResponse('Request is not for an "on order shipped" webhook', status_code=400)
-
-    # Makes the response include items that were shipped with that order
-    resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
+async def main(msg: func.QueueMessage) -> None:
+    resource_url = msg.get_body().decode("utf-8")
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
 
-    try:
-        logging.info(f'Creating an order sheet for {order_info["shipments"][0]["orderKey"]}')
-        order_sheet = generate_order_sheet(order_info)
-    except IndexError as e:
-        logging.info('The batch ID for this resource_url has no shipments associated with it')
-        return func.HttpResponse('The batch ID for this resource_url has no shipments associated with it', status_code=422)
-    except ValueError as e:
-        # Order contains items with either a quantity ordered or unit price that is <= 0, usually for replacement orders
-        traceback = e.__traceback__
-        while traceback:
-            logging.info(f"{traceback.tb_frame.f_code.co_filename}: {traceback.tb_lineno}")
-        return func.HttpResponse(str(e), status_code=400)
-    except KeyError as e:
-        logging.info(str(e))
-        return func.HttpResponse(str(e), status_code=400)
+    order_sheet = generate_order_sheet(order_info)
 
     today = datetime.date.today().strftime('%m-%d-%Y')
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
     if not await container.exists():
         await container.create_container()
 
-    # Upload and close container
     try:
         await container.upload_blob(name='EagleOrder_M' + str(order_info['shipments'][0]['orderId']) + 'O.txt', data=order_sheet)
+        logging.info(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}')
     except ResourceExistsError:
         logging.warning(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists')
-        return func.HttpResponse(f'Order sheet for {order_info["shipments"][0]["orderKey"]} already exists', status_code=400)
     finally:
         await container.close()
 
-    logging.info(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}')
-    return func.HttpResponse(f'Successfully created Eagle order sheet for {order_info["shipments"][0]["orderKey"]}', status_code=200)
 
 def generate_order_sheet(order: dict)-> str:
     """
@@ -72,11 +41,8 @@ def generate_order_sheet(order: dict)-> str:
     """
     order_data = order['shipments'][0]
 
-    try:
-        header = _generate_header(order_data)
-        details = _generate_details(order_data)
-    except KeyError as e:
-        raise e
+    header = _generate_header(order_data)
+    details = _generate_details(order_data)
 
     return header + '\n' + details
 
@@ -85,8 +51,6 @@ def _generate_header(order_info: dict) -> str:
     Generates a header entry for an order
 
     :param order_info: dict containing information for a singular order
-    :raise ValueError: Quantity ordered or the unit price of an item is <= 0, usually happens for replacement orders
-    :raise ValueError: The shipment has no shipment items associated with it, most likely due to a manual order
     :return: str containing header details for an Eagle order
     """
     # Initialize header
@@ -107,17 +71,10 @@ def _generate_header(order_info: dict) -> str:
     header += ' ' * 3
 
     # Tax rate charged
-    try:
-        tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
-        unit_price = order_info['shipmentItems'][0]['unitPrice']
-        quantity_ordered = order_info['shipmentItems'][0]['quantity']
-    except TypeError:
-        raise ValueError('The shipment has no shipment items associated with it')
-
-    try:
-        tax_rate = tax_amount / quantity_ordered / unit_price
-    except ZeroDivisionError:
-        raise ValueError('Quantity ordered or unit price is not a number greater than 0')
+    tax_amount = order_info['shipmentItems'][0]['taxAmount'] or 0
+    unit_price = order_info['shipmentItems'][0]['unitPrice']
+    quantity_ordered = order_info['shipmentItems'][0]['quantity']
+    tax_rate = tax_amount / quantity_ordered / unit_price
     header += normalize_value(tax_rate, 0, 5, signed=False)
 
     # Pricing indicator and percentage
@@ -160,10 +117,9 @@ def _generate_header(order_info: dict) -> str:
     if base_order_num.find('_') != -1:
         base_order_num = re.match(r'.+?(?=_)', base_order_num).group()
     payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{base_order_num}").json()
-    try:
-        instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
-    except KeyError:
-        raise KeyError("This order number does not exist in Magento, could be a manual or eBay order")
+    # Do not catch this exception, it is used to enqueue the message and process it later
+    # in the case the order does not exists in Magento yet
+    instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
     header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
 
     # Instructions 2
