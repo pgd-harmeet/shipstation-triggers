@@ -42,6 +42,9 @@ async def main(req: func.HttpRequest) -> func.HttpResponse:
         while traceback:
             logging.info(f"{traceback.tb_frame.f_code.co_filename}: {traceback.tb_lineno}")
         return func.HttpResponse(str(e), status_code=400)
+    except KeyError as e:
+        logging.info(str(e))
+        return func.HttpResponse(str(e), status_code=400)
 
     today = datetime.date.today().strftime('%m-%d-%Y')
     container = ContainerClient.from_connection_string(conn_str=os.environ['AzureWebJobsStorage'], container_name='eagle-' + today)
@@ -69,8 +72,11 @@ def generate_order_sheet(order: dict)-> str:
     """
     order_data = order['shipments'][0]
 
-    header = _generate_header(order_data)
-    details = _generate_details(order_data)
+    try:
+        header = _generate_header(order_data)
+        details = _generate_details(order_data)
+    except KeyError as e:
+        raise e
 
     return header + '\n' + details
 
@@ -153,7 +159,10 @@ def _generate_header(order_info: dict) -> str:
     base_order_num = order_info['orderNumber']
     if base_order_num.find('_') != -1:
         base_order_num = re.match(r'.+?(?=_)', base_order_num).group()
-    payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{base_order_num}").json()
+    try:
+        payment_info = requests.get(os.environ["MAGESTACK_URL"] + f"/payments/{base_order_num}").json()
+    except KeyError:
+        raise KeyError("This order number does not exist in Magento, could be a manual or eBay order")
     instruc_1_string = f"{payment_info['entity_id']}:{payment_info['shipping']}"
     header += instruc_1_string + ' ' * (30 - len(instruc_1_string))
 
