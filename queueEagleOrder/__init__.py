@@ -18,15 +18,18 @@ def main(req: func.HttpRequest, msg: func.Out[func.QueueMessage]) -> func.HttpRe
   logging.info(resource_url)
 
   if resource_type != "SHIP_NOTIFY":
+    logging.warn("The resource is not a SHIP_NOTIFY resource")
     return func.HttpResponse("The resource is not a SHIP_NOTIFY resource", status_code=400)
 
   resource_url = resource_url.replace('includeShipmentItems=False', 'includeShipmentItems=True')
   try:
     validate_order(resource_url)
   except ValueError as e:
+    logging.info(f"Unable to queue resource_url: {str(e)}")
     return func.HttpResponse(str(e), status_code=400)
 
   msg.set(resource_url)
+  logging.info(f"{resource_url} successfully queued")
   return func.HttpResponse("Successfully queued this resource URL", status_code=200)
 
 def validate_order(resource_url) -> None:
