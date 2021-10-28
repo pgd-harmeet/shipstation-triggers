@@ -14,6 +14,7 @@ import requests
 
 async def main(msg: func.QueueMessage) -> None:
     resource_url = msg.get_body().decode("utf-8")
+    logging.info(f"Resource URL: {resource_url}")
     order_info = requests.get(resource_url, None, headers={'Authorization': os.environ['AUTH_CREDS']}).json()
 
     order_sheet = generate_order_sheet(order_info)
